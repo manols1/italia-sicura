@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Italia Sicura — Demo · Powered by UrbanOS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<style>
+:root{
+  --bg:#f4f6fb; --panel:#ffffff; --panel2:#f8fafc; --text:#0f172a; --muted:#64748b;
+  --border:#e2e8f0; --accent:#0e5fd8; --accent2:#12b981; --danger:#e11d48; --warn:#f59e0b;
+  --shadow:0 4px 24px rgba(15,23,42,.08); --radius:16px;
+}
+body.dark{
+  --bg:#0b1220; --panel:#121a2b; --panel2:#0e1626; --text:#e2e8f0; --muted:#94a3b8;
+  --border:#1f2b42; --shadow:0 4px 24px rgba(0,0,0,.45);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;transition:background .3s,color .3s}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select{font-family:inherit}
+
+.demo-banner{background:linear-gradient(90deg,#1e293b,#0e5fd8);color:#fff;text-align:center;padding:6px 12px;font-size:12px;letter-spacing:.3px}
+.demo-banner b{font-weight:700}
+
+header.topbar{display:flex;align-items:center;gap:14px;padding:10px 20px;background:var(--panel);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1200;box-shadow:var(--shadow)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:17px;white-space:nowrap}
+.logo .shield{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#0e5fd8,#12b981);display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px}
+.logo small{display:block;font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.5px}
+.tabs{display:flex;gap:4px;margin-left:16px;flex:1;overflow-x:auto}
+.tab-btn{padding:9px 15px;border-radius:10px;font-weight:600;font-size:13px;color:var(--muted);white-space:nowrap;transition:.2s}
+.tab-btn:hover{background:var(--panel2);color:var(--text)}
+.tab-btn.active{background:linear-gradient(135deg,#0e5fd8,#1173e8);color:#fff}
+.top-actions{display:flex;align-items:center;gap:8px}
+.icon-btn{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--panel2);border:1px solid var(--border);font-size:16px;position:relative;transition:.2s}
+.icon-btn:hover{border-color:var(--accent)}
+.icon-btn .badge{position:absolute;top:-5px;right:-5px;background:var(--danger);color:#fff;font-size:10px;font-weight:700;min-width:17px;height:17px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+
+.weather-strip{display:flex;align-items:center;gap:10px;margin:14px 20px 0;padding:10px 16px;border-radius:12px;background:linear-gradient(90deg,rgba(14,95,216,.12),rgba(18,185,129,.12));border:1px solid var(--border);font-size:13px}
+.weather-strip .w-ico{font-size:18px}
+
+.layout{display:flex;gap:0;margin:14px 20px;height:calc(100vh - 200px);min-height:520px}
+.sidebar{width:360px;min-width:320px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;padding-right:2px;flex-shrink:0}
+.map-wrap{flex:1;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow);position:relative;min-width:0}
+#map,#map2{width:100%;height:100%;background:var(--panel2)}
+body.dark .leaflet-tile{filter:brightness(.65) invert(1) hue-rotate(180deg) saturate(.5)}
+body.dark .leaflet-container{background:#0b1220}
+
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px}
+.card h3{font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:7px;text-transform:uppercase;letter-spacing:.4px}
+.card h3 .dot{width:8px;height:8px;border-radius:4px;background:var(--accent2)}
+
+.search-box{width:100%;padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:13px;outline:none;transition:.2s}
+.search-box:focus{border-color:var(--accent)}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:var(--panel2);font-size:12px;font-weight:600;color:var(--muted);transition:.15s}
+.chip.on{background:linear-gradient(135deg,#0e5fd8,#1173e8);color:#fff;border-color:transparent}
+
+.seg{display:flex;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.seg button{flex:1;padding:7px 4px;font-size:11.5px;font-weight:600;color:var(--muted);background:var(--panel2)}
+.seg button.on{background:var(--accent);color:#fff}
+
+.field-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:10px 0 6px}
+select.sel,input.inp{width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:13px;outline:none}
+
+.feed{display:flex;flex-direction:column;gap:8px}
+.feed-item{display:flex;gap:10px;padding:10px;border-radius:12px;border:1px solid var(--border);background:var(--panel2);cursor:pointer;transition:.15s}
+.feed-item:hover{border-color:var(--accent);transform:translateX(2px)}
+.feed-item .fi-ico{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.feed-item .fi-title{font-weight:600;font-size:13px;line-height:1.3}
+.feed-item .fi-sub{font-size:11.5px;color:var(--muted);margin-top:3px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.tag{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.3px}
+.tag.bassa{background:rgba(18,185,129,.15);color:#0a9e6e}
+.tag.media{background:rgba(245,158,11,.15);color:#c47d09}
+.tag.alta{background:rgba(225,29,72,.13);color:#dc2861}
+.tag.nuovo{background:rgba(99,102,241,.14);color:#6366f1}
+.tag.in-verifica{background:rgba(245,158,11,.15);color:#c47d09}
+.tag.confermato{background:rgba(225,29,72,.13);color:#dc2861}
+.tag.risolto{background:rgba(100,116,139,.15);color:#64748b}
+body.dark .tag.risolto{color:#94a3b8}
+
+.map-ctrl{position:absolute;z-index:1000;display:flex;flex-direction:column;gap:8px;right:12px;top:12px}
+.map-ctrl .icon-btn{box-shadow:var(--shadow)}
+.leaflet-control-attribution{font-size:9px!important}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 16px;border-radius:12px;font-weight:700;font-size:13px;transition:.2s}
+.btn.primary{background:linear-gradient(135deg,#0e5fd8,#1173e8);color:#fff;box-shadow:0 4px 14px rgba(14,95,216,.35)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{border:1px solid var(--border);background:var(--panel2);color:var(--text)}
+.btn.ghost:hover{border-color:var(--accent)}
+.btn.green{background:linear-gradient(135deg,#0a9e6e,#12b981);color:#fff}
+.btn.red{background:rgba(225,29,72,.1);color:var(--danger);border:1px solid rgba(225,29,72,.3)}
+.btn.sm{padding:6px 10px;font-size:12px;border-radius:9px}
+.btn.full{width:100%}
+
+.places{display:flex;flex-direction:column;gap:10px}
+.place{border:1px solid var(--border);border-radius:14px;padding:12px;background:var(--panel2);transition:.2s}
+.place:hover{border-color:var(--accent)}
+.place-head{display:flex;align-items:center;gap:10px;cursor:pointer}
+.place-head .p-ico{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:17px;background:linear-gradient(135deg,rgba(14,95,216,.15),rgba(18,185,129,.15))}
+.place-head .p-name{font-weight:700;font-size:13.5px}
+.place-head .p-sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+.place-head .p-toggle{margin-left:auto;font-size:18px;color:var(--muted)}
+.place-body{margin-top:10px;display:none;flex-direction:column;gap:10px}
+.place.open .place-body{display:flex}
+.range-row{display:flex;align-items:center;gap:10px}
+.time-tags{display:flex;gap:4px;flex-wrap:wrap}
+.time-tags .chip{padding:4px 8px;font-size:11px}
+.p-radius{font-weight:700;font-size:12px;color:var(--accent);min-width:52px;text-align:right}
+input[type=range]{accent-color:var(--accent);flex:1}
+.p-status{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.p-event{display:flex;gap:8px;align-items:flex-start;font-size:12px;padding:8px 10px;border-radius:10px;background:rgba(225,29,72,.06);border:1px solid rgba(225,29,72,.15)}
+.p-event .dist{font-weight:800;color:var(--danger);flex-shrink:0}
+.p-clear-all{font-size:11.5px;color:var(--muted);text-align:center;padding:2px}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+.kpi{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:var(--shadow)}
+.kpi .k-l{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.kpi .k-v{font-size:26px;font-weight:800;margin-top:4px}
+.kpi .k-s{font-size:11.5px;color:var(--muted);margin-top:3px}
+.control-grid{display:grid;grid-template-columns:2fr 1fr;gap:14px}
+@media(max-width:900px){.control-grid{grid-template-columns:1fr}}
+
+table.queue{width:100%;border-collapse:collapse;font-size:12.5px}
+table.queue th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--border)}
+table.queue td{padding:10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.trust-bar{display:flex;align-items:center;gap:8px}
+.tb-track{width:64px;height:6px;border-radius:3px;background:var(--border);overflow:hidden}
+.tb-fill{height:100%;border-radius:3px}
+.sco{font-weight:800;font-size:12px;padding:3px 8px;border-radius:8px;display:inline-block}
+.sco.hi{background:rgba(225,29,72,.13);color:var(--danger)}
+.sco.md{background:rgba(245,158,11,.15);color:#c47d09}
+.sco.lo{background:rgba(18,185,129,.15);color:#0a9e6e}
+
+.audit{display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto}
+.audit-item{display:flex;gap:10px;font-size:12px;padding:8px 10px;border-radius:10px;background:var(--panel2);border:1px solid var(--border)}
+.audit-item .a-t{color:var(--muted);font-size:11px;white-space:nowrap}
+
+.modal-bg{position:fixed;inset:0;background:rgba(2,8,20,.6);backdrop-filter:blur(4px);z-index:2000;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-bg.show{display:flex}
+.modal{background:var(--panel);border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.4);width:100%;max-width:560px;max-height:88vh;overflow-y:auto;padding:24px;animation:pop .25s ease;position:relative}
+@keyframes pop{from{transform:translateY(14px) scale(.97);opacity:0}to{transform:none;opacity:1}}
+.modal h2{font-size:18px;font-weight:800;margin-bottom:4px}
+.modal .m-sub{color:var(--muted);font-size:12.5px;margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.modal-close{position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:10px;background:var(--panel2);border:1px solid var(--border);font-size:15px;z-index:2}
+
+.ev-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.ev-meta .em{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:10px}
+.ev-meta .em .l{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.ev-meta .em .v{font-weight:700;font-size:13.5px;margin-top:3px}
+.scores{display:flex;gap:10px;margin:12px 0}
+.score-box{flex:1;border:1px solid var(--border);border-radius:14px;padding:12px;background:var(--panel2)}
+.score-box .l{font-size:11px;font-weight:700;color:var(--muted)}
+.score-box .v{font-size:22px;font-weight:800;margin:2px 0}
+.score-box .d{font-size:11px;color:var(--muted);line-height:1.4}
+.timeline{display:flex;flex-direction:column;gap:0;margin:14px 0}
+.tl-item{display:flex;gap:12px;position:relative;padding-bottom:16px}
+.tl-item:before{content:'';position:absolute;left:5px;top:16px;bottom:0;width:2px;background:var(--border)}
+.tl-item:last-child:before{display:none}
+.tl-dot{width:12px;height:12px;border-radius:6px;background:var(--accent);flex-shrink:0;margin-top:4px}
+.tl-item .tl-t{font-size:10.5px;font-weight:700;color:var(--muted)}
+.tl-item .tl-x{font-size:12.5px;line-height:1.45;margin-top:2px}
+.modal-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+
+.chat-wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:14px;height:100%}
+.chat-hi{text-align:center;padding:30px 10px}
+.chat-hi .big{font-size:34px}
+.chat-hi h2{font-size:20px;margin:8px 0 6px}
+.chat-hi p{color:var(--muted);font-size:13px}
+.quick-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:16px}
+.msgs{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding-bottom:10px}
+.msg{max-width:82%;padding:12px 15px;border-radius:16px;font-size:13.5px;line-height:1.55;white-space:pre-wrap}
+.msg.user{align-self:flex-end;background:linear-gradient(135deg,#0e5fd8,#1173e8);color:#fff;border-bottom-right-radius:4px}
+.msg.bot{align-self:flex-start;background:var(--panel);border:1px solid var(--border);border-bottom-left-radius:4px;box-shadow:var(--shadow)}
+.chat-input-row{display:flex;gap:8px}
+.chat-input-row input{flex:1;padding:12px 16px;border-radius:14px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:14px;outline:none}
+.chat-input-row input:focus{border-color:var(--accent)}
+
+.toasts{position:fixed;top:74px;right:20px;z-index:3000;display:flex;flex-direction:column;gap:10px;width:340px}
+.toast{background:var(--panel);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:13px 15px;animation:slidein .35s ease;cursor:pointer}
+@keyframes slidein{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
+.toast .t-head{display:flex;gap:8px;align-items:center;font-weight:700;font-size:13px}
+.toast .t-x{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.45}
+.notif-panel{position:fixed;top:64px;right:20px;width:340px;max-height:70vh;overflow-y:auto;border-radius:16px;display:none;z-index:2500}
+.notif-panel.show{display:block}
+
+.marker-pin{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50% 50% 50% 6px;transform:rotate(-45deg);border:2.5px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.35);font-size:15px}
+.marker-pin span{transform:rotate(45deg)}
+.marker-pin.new{animation:pulse 1.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(225,29,72,.5)}70%{box-shadow:0 0 0 12px rgba(225,29,72,0)}100%{box-shadow:0 0 0 0 rgba(225,29,72,0)}}
+
+footer.foot{text-align:center;color:var(--muted);font-size:11.5px;padding:16px;line-height:1.6}
+@media(max-width:900px){
+  .layout{flex-direction:column;height:auto}
+  .map-wrap{height:52vh;min-height:340px}
+  .sidebar{width:100%;min-width:0}
+  .toasts{width:calc(100vw - 32px);right:16px}
+  .tabs .tab-btn{padding:8px 10px;font-size:12px}
+}
+</style>
+</head>
+<body>
+
+<div class="demo-banner">🧪 <b>DEMO INTERATTIVA</b> — Tutti i dati sono simulati. Nessun evento reale. Concetto "Italia Sicura · Powered by UrbanOS" v1.0</div>
+
+<header class="topbar">
+  <div class="logo">
+    <div class="shield">🛡️</div>
+    <div>Italia Sicura<small>POWERED BY URBANOS</small></div>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button class="tab-btn active" data-view="mappa">🗺️ Mappa Live</button>
+    <button class="tab-btn" data-view="luoghi">📍 I miei luoghi</button>
+    <button class="tab-btn" data-view="control">🖥️ UrbanOS Control Room</button>
+    <button class="tab-btn" data-view="assistant">🤖 AI Safety Assistant</button>
+  </nav>
+  <div class="top-actions">
+    <button class="icon-btn" id="btn-add-place" title="Aggiungi un luogo">➕</button>
+    <button class="icon-btn" id="btn-notif" title="Notifiche">🔔<span class="badge" id="notif-badge" style="display:none">0</span></button>
+    <button class="icon-btn" id="btn-theme" title="Tema chiaro/scuro">🌙</button>
+  </div>
+</header>
+
+<div id="panel-notif" class="notif-panel card"></div>
+
+<div id="view-mappa" class="view">
+  <div class="weather-strip"><span class="w-ico">🌧️</span><span><b>Allerta meteo demo</b> — Pioggia intensa prevista a Milano oggi 15:00–20:00. Fonte: simulazione dati ufficiali. Rischio allagamenti in zone depresse.</span></div>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="card">
+        <input class="search-box" id="search" placeholder="🔍 Cerca evento, zona o indirizzo… (es. Isola, allagamento)">
+        <div class="field-label">Categorie</div>
+        <div class="chips" id="cat-chips"></div>
+        <div class="field-label">Gravità</div>
+        <div class="seg" id="seg-sev">
+          <button data-v="all" class="on">Tutte</button>
+          <button data-v="media">Media +</button>
+          <button data-v="alta">Solo alta</button>
+        </div>
+        <div class="field-label">Periodo</div>
+        <select class="sel" id="sel-period">
+          <option value="all">Tutto lo storico demo</option>
+          <option value="1440">Ultime 24 ore</option>
+          <option value="10080">Ultimi 7 giorni</option>
+        </select>
+        <div class="field-label">Visualizzazione</div>
+        <div class="seg" id="seg-vis">
+          <button data-v="pins" class="on">📌 Pin</button>
+          <button data-v="heat">🔥 Heatmap</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3><span class="dot"></span>Feed · Ultimi eventi</h3>
+        <div class="feed" id="feed"></div>
+      </div>
+    </aside>
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="map-ctrl">
+        <button class="icon-btn" id="btn-near" title="Eventi vicino a me (simulato)">🎯</button>
+        <button class="icon-btn" id="btn-instance" title="Segnalazione rapida (demo)">⚡</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="view-luoghi" class="view" style="display:none">
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="card">
+        <h3><span class="dot"></span>My Places Guardian</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5">Tieni d'occhio i luoghi che contano anche quando non ci sei. Notifica a distanza simulata, come progettato per l'app reale.</p>
+        <button class="btn primary full" id="btn-add-place2">➕ Aggiungi luogo da monitorare</button>
+      </div>
+      <div class="card">
+        <div class="places" id="places"></div>
+      </div>
+    </aside>
+    <div class="map-wrap">
+      <div id="map2" style="width:100%;height:100%"></div>
+      <div class="map-ctrl">
+        <button class="icon-btn" id="btn-instance2" title="Simula nuovo evento (geofencing demo)">🔔</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="view-control" class="view" style="display:none">
+  <div style="margin:14px 20px">
+    <div class="kpis" id="kpis"></div>
+    <div class="control-grid">
+      <div class="card">
+        <h3><span class="dot"></span>Coda di moderazione · UrbanOS</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">Eventi in attesa di verifica, ordinati per priorità (gravità × affidabilità). Le azioni modificano la mappa in tempo reale.</p>
+        <table class="queue">
+          <thead><tr><th>Evento</th><th>Gravità</th><th>Trust Score</th><th>Severity</th><th>Azioni</th></tr></thead>
+          <tbody id="queue-body"></tbody>
+        </table>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="card">
+          <h3><span class="dot"></span>Audit trail AI &amp; moderazione</h3>
+          <div class="audit" id="audit"></div>
+        </div>
+        <div class="card">
+          <h3><span class="dot"></span>Protezioni attive (F01–F12)</h3>
+          <div class="chips" id="ai-flags"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="view-assistant" class="view" style="display:none">
+  <div style="margin:14px 20px;height:calc(100vh - 200px);min-height:460px">
+    <div class="chat-wrap">
+      <div class="msgs" id="msgs">
+        <div class="chat-hi">
+          <div class="big">🤖</div>
+          <h2>AI Safety Assistant</h2>
+          <p>Sintesi degli eventi dalla mappa demo, con fonti, orari e stato di verifica.<br>Non inventa informazioni mancanti.</p>
+          <div class="quick-chips" id="quick"></div>
+        </div>
+      </div>
+      <div class="chat-input-row">
+        <input id="chat-input" placeholder="Chiedi: «Cosa succede vicino alla scuola?»">
+        <button class="btn primary" id="btn-send">Invia</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="foot">
+  Italia Sicura è un concept dimostrativo — non è un servizio di emergenza. In caso di urgenza chiama <b>112</b>.<br>
+  Non riconoscimento facciale · Nessuna profilazione di persone · GDPR by design · Dati demo non reali
+</footer>
+
+<div class="modal-bg" id="modal-ev"><div class="modal" id="modal-ev-body"></div></div>
+<div class="modal-bg" id="modal-place">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-place')">✕</button>
+    <h2 id="pm-title">Nuovo luogo</h2>
+    <p class="m-sub">Posiziona il luogo cliccando sulla mappa (tasto 📍 «Scegli sulla mappa») e ottimizza qui.</p>
+    <div class="field-label">Nome</div>
+    <input class="inp" id="pm-name" placeholder="es. Scuola dei figli">
+    <div class="field-label">Tipo</div>
+    <select class="sel" id="pm-type">
+      <option>🏠 Casa</option><option>💼 Lavoro</option><option>🎒 Scuola / Università</option><option>👨‍👩‍👧 Familiari</option><option>🏨 Temporaneo (viaggio)</option>
+    </select>
+    <div class="field-label">Raggio di monitoraggio</div>
+    <div class="range-row"><span>100 m</span><input type="range" id="pm-radius" min="100" max="5000" step="100" value="500"><span class="p-radius" id="pm-radius-label">500 m</span></div>
+    <div class="field-label">Livello minimo per le notifiche</div>
+    <div class="seg" id="pm-sev"><button data-v="all" class="on">Tutti</button><button data-v="media">Medi +</button><button data-v="alta">Gravi</button></div>
+    <div class="field-label">Giorni attivi</div>
+    <div class="time-tags" id="pm-days"></div>
+    <div class="field-label">Orario attivo</div>
+    <div class="range-row"><input type="time" class="inp" id="pm-from" value="07:00" style="flex:1"><span>→</span><input type="time" class="inp" id="pm-to" value="22:00" style="flex:1"></div>
+    <div class="field-label">Scadenza automatica (luoghi temporanei — D12)</div>
+    <input type="date" class="inp" id="pm-expiry">
+    <div class="modal-actions">
+      <button class="btn primary" id="pm-save" style="flex:1">💾 Salva luogo</button>
+      <button class="btn ghost" id="pm-go-map">📍 Scegli sulla mappa</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+'use strict';
+var CATS = {
+  water:{l:'Allagamento',i:'💧'}, tree:{l:'Albero pericolante',i:'🌳'},
+  light:{l:'Illuminazione guasta',i:'💡'}, pothole:{l:'Buche e dissesti',i:'🕳️'},
+  trash:{l:'Rifiuti',i:'🗑️'}, fire:{l:'Fumo / incendio',i:'🔥'},
+  works:{l:'Cantiere / strade',i:'🚧'}, transport:{l:'Trasporti',i:'🚌'},
+  weather:{l:'Meteo',i:'🌧️'}
+};
+var SEV = {bassa:{l:'Bassa',c:'#12b981'}, media:{l:'Media',c:'#f59e0b'}, alta:{l:'Alta',c:'#e11d48'}};
+var ST = {nuovo:'Nuovo', 'in-verifica':'In verifica', confermato:'Confermato', risolto:'Risolto'};
+
+var NEXT_ID = 100;
+function E0(o){ return Object.assign({id:'e'+(NEXT_ID++), follow:false, reports:1}, o); }
+
+var EVENTS = [
+ E0({title:'Allagamento in via Pola',cat:'water',sev:'alta',st:'confermato',lat:45.4861,lng:9.1919,zone:'Isola',min:18,reports:7,trust:92,sev_score:87,
+   tl:[[13,'Segnalazione inviata da cittadino (voce → scheda)'],[11,'Seconda segnalazione indipendente: correlazione automatica'],[6,'Verifica di coerenza delle foto superata'],[2,'Confermato · livello di attendibilità alto']]}),
+ E0({title:'Albero pericolante su panchina',cat:'tree',sev:'alta',st:'in-verifica',lat:45.4725,lng:9.1780,zone:'Parco Sempione',min:42,reports:3,trust:74,sev_score:81,
+   tl:[[42,'Segnalazione con foto'],[30,'AI: nessun dato personale nel testo, pubblicata in verifica'],[21,'Conferma di 2 utenti vicini']]}),
+ E0({title:'Lampioni spenti per 500 metri',cat:'light',sev:'media',st:'confermato',lat:45.5130,lng:9.1930,zone:'Bicocca',min:97,reports:5,trust:88,sev_score:44,
+   tl:[[97,'Segnalazione'],[80,'Doppioni uniti automaticamente (3 segnalazioni simili)'],[65,'Confermato dalla community']]}),
+ E0({title:'Cantiere chiuso fuori orario senza recinzione',cat:'works',sev:'alta',st:'nuovo',lat:45.4530,lng:9.2010,zone:'Porta Romana',min:8,reports:1,trust:61,sev_score:78,
+   tl:[[8,'Segnalazione rapida dal pulsante ⚡']]}),
+ E0({title:'Fumo dal tetto (falso allarme)',cat:'fire',sev:'alta',st:'risolto',lat:45.4565,lng:9.1790,zone:'Navigli',min:260,reports:9,trust:95,sev_score:90,
+   tl:[[260,'Più segnalazioni di fumo'],[240,'Fonte ufficiale collegata: BBQ autorizzato'],[190,'Risolto · nessun incendio']]}),
+ E0({title:'Buche multiple sulla ciclabile',cat:'pothole',sev:'media',st:'confermato',lat:45.4780,lng:9.2130,zone:'Loreto',min:640,reports:4,trust:83,sev_score:40,
+   tl:[[640,'Segnalazione'],[500,'Conferme indipendenti'],[300,'Aggiornamento: inoltrato all ufficio strade (demo)']]}),
+ E0({title:'Tram sospeso lungo il binario',cat:'transport',sev:'media',st:'risolto',lat:45.4850,lng:9.1870,zone:'Garibaldi',min:180,reports:6,trust:90,sev_score:52,
+   tl:[[180,'Segnalazione'],[150,'Aggiornamento: soccorso tecnico sul posto'],[120,'Risolto · ripresa della circolazione']]}),
+ E0({title:'Rifiuti ingombranti abbandonati',cat:'trash',sev:'bassa',st:'nuovo',lat:45.4530,lng:9.1780,zone:'Porta Genova',min:55,reports:1,trust:66,sev_score:20,
+   tl:[[55,'Segnalazione con foto']]}),
+ E0({title:'Illuminazione guasta nel parco giochi',cat:'light',sev:'media',st:'confermato',lat:45.4875,lng:9.1955,zone:'Isola / Area scuola',min:320,reports:3,trust:85,sev_score:47,
+   tl:[[320,'Segnalazione del quartiere'],[300,'Confermato · zona frequentata da famiglie']]}),
+ E0({title:'Coppo in caduta da tetto',cat:'works',sev:'alta',st:'in-verifica',lat:45.4760,lng:9.2260,zone:'Città Studi',min:25,reports:2,trust:58,sev_score:84,
+   tl:[[25,'Segnalazione'],[20,'Mascheramento automatico volti sulla foto applicato (F07)'],[12,'In attesa di conferma umana']]}),
+ E0({title:'Striscia di grandine registrata',cat:'weather',sev:'media',st:'confermato',lat:45.5060,lng:9.1570,zone:'Certosa',min:75,reports:8,trust:91,sev_score:56,
+   tl:[[75,'Più segnalazioni coerenti'],[70,'Coerenza temporale e geografica verificata (F16)'],[60,'Confermato']]}),
+ E0({title:'Crepazione estesa nell asfalto',cat:'pothole',sev:'bassa',st:'nuovo',lat:45.4780,lng:9.1110,zone:'Baggio',min:140,reports:1,trust:70,sev_score:18,
+   tl:[[140,'Segnalazione']]}),
+ E0({title:'Scarico bloccato: rischio allagamento',cat:'water',sev:'media',st:'nuovo',lat:45.4650,lng:9.2470,zone:'Forlanini',min:35,reports:2,trust:64,sev_score:50,
+   tl:[[35,'Segnalazione con video breve (moderato F07)']]}),
+ E0({title:'Cassonetto rovesciato e spostato',cat:'trash',sev:'bassa',st:'risolto',lat:45.4785,lng:9.1245,zone:'San Siro',min:720,reports:2,trust:80,sev_score:12,
+   tl:[[720,'Segnalazione'],[650,'Conferme'],[400,'Risolto dalla comunità (G09)']]}),
+ E0({title:'Segnale stradale piegato',cat:'works',sev:'bassa',st:'confermato',lat:45.4702,lng:9.1900,zone:'Magenta / S.Ambrogio',min:900,reports:3,trust:87,sev_score:22,
+   tl:[[900,'Segnalazione'],[860,'Confermato']]}),
+ E0({title:'Vento forte: ramo spezzato su strada',cat:'weather',sev:'media',st:'risolto',lat:45.4990,lng:9.2230,zone:'Niguarda',min:1500,reports:5,trust:92,sev_score:58,
+   tl:[[1500,'Segnalazioni multiple'],[1450,'Confermato · allerta meteo in corso'],[1300,'Risolto · strada liberata']]}),
+ E0({title:'Trivella aperta non segnalata',cat:'works',sev:'media',st:'in-verifica',lat:45.4600,lng:9.1755,zone:'Solferino',min:70,reports:1,trust:52,sev_score:49,
+   tl:[[70,'Segnalazione'],[60,'Verifica in corso: coerenza geografica (F16)']]}),
+ E0({title:'Allarme temporale scaduto',cat:'weather',sev:'bassa',st:'risolto',lat:45.4642,lng:9.1900,zone:'Centro',min:1370,reports:0,trust:99,sev_score:10,
+   tl:[[1370,'Avviso meteo da fonte ufficiale (simulato)'],[1000,'Scaduto automaticamente (D17)']]})
+];
+
+var PLACES = [
+ {id:'p1', emoji:'🏠', name:'Casa', sub:'Monza · Residenza', lat:45.5840, lng:9.2740, r:500, sev:'media', from:'00:00', to:'23:59', temp:null, on:true},
+ {id:'p2', emoji:'💼', name:'Lavoro', sub:'Milano · Porta Nuova', lat:45.4853, lng:9.1895, r:500, sev:'all', from:'08:00', to:'19:00', temp:null, on:true},
+ {id:'p3', emoji:'🎒', name:'Scuola dei figli', sub:'Milano · Area scuola Isola', lat:45.4878, lng:9.1925, r:300, sev:'media', from:'07:30', to:'18:00', temp:null, on:true}
+];
+var DAYS = ['L','M','M','G','V','S','D'];
+
+var SIM_POOL = [
+ {near:'p3', title:'Allagamento vicino area scuola', cat:'water', sev:'alta', dLat:0.0016, dLng:-0.0018, dm:1},
+ {near:'p2', title:'Albero inclinato su via di Porta Nuova', cat:'tree', sev:'media', dLat:-0.0011, dLng:0.0014, dm:1},
+ {near:'p1', title:'Guasto illuminazione zona residenziale', cat:'light', sev:'media', dLat:0.0013, dLng:0.0015, dm:2},
+ {near:'p3', title:'Cassonetto incendiato in area adiacente (demo moderata)', cat:'fire', sev:'alta', dLat:-0.0014, dLng:-0.0012, dm:1},
+ {near:'p2', title:'Fumo sospetto (da verificare)', cat:'fire', sev:'media', dLat:0.0009, dLng:-0.0016, dm:2}
+];
+
+var state = {cats:{}, sev:'all', period:'all', search:'', vis:'pins', notifs:[], audit:[], editingPlace:null, _draft:null, _pendingSave:false};
+Object.keys(CATS).forEach(function(k){ state.cats[k]=true; });
+
+function $(s){ return document.querySelector(s); }
+function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function dist(a,b,c,d){ var R=6371000,t=Math.PI/180,dla=(c-a)*t,dlb=(d-b)*t, x=Math.sin(dla/2)*Math.sin(dla/2)+Math.cos(a*t)*Math.cos(c*t)*Math.sin(dlb/2)*Math.sin(dlb/2); return 2*R*Math.asin(Math.sqrt(x)); }
+function fmtD(m){ return m<60 ? m+' min fa' : m<1440 ? Math.round(m/60)+' ore fa' : Math.round(m/1440)+' giorni fa'; }
+function fmtM(r){ return r<1000 ? r+' m' : (r/1000).toLocaleString('it-IT',{maximumFractionDigits:1})+' km'; }
+function findEv(id){ var r=null; EVENTS.forEach(function(e){ if(e.id===id) r=e; }); return r; }
+function findPlace(id){ var r=null; PLACES.forEach(function(p){ if(p.id===id) r=p; }); return r; }
+
+function visible(e){
+  if(!state.cats[e.cat]) return false;
+  if(state.sev==='alta' && e.sev!=='alta') return false;
+  if(state.sev==='media' && e.sev==='bassa') return false;
+  if(state.period==='1440' && e.min>1440) return false;
+  if(state.period==='10080' && e.min>10080) return false;
+  if(state.search){
+    var q=state.search.toLowerCase();
+    if((e.title+' '+e.zone).toLowerCase().indexOf(q)<0) return false;
+  }
+  return true;
+}
+
+/* ---------- MAPPE ---------- */
+var layers = { pins:null, heat:null, fences:null };
+var map, map2;
+
+function markerFor(e){
+  var solved = e.st==='risolto';
+  var col = solved ? '#64748b' : SEV[e.sev].c;
+  var cls = 'marker-pin' + ((e.st==='nuovo' && !solved) ? ' new' : '');
+  return L.divIcon({className:'', html:'<div class="'+cls+'" style="background:'+col+'"><span>'+CATS[e.cat].i+'</span></div>', iconSize:[34,34], iconAnchor:[17,32], popupAnchor:[0,-32]});
+}
+function drawEvents(){
+  var g = layers.pins; g.clearLayers();
+  EVENTS.forEach(function(e){
+    if(!visible(e)) return;
+    L.marker([e.lat,e.lng],{icon:markerFor(e)}).addTo(g).on('click',function(){ openEvent(e.id); });
+  });
+  var h = layers.heat; h.clearLayers();
+  L.heatLayer(EVENTS.filter(visible).map(function(e){ return [e.lat,e.lng, e.sev==='alta'?1:(e.sev==='media'?0.65:0.35)]; }),
+    {radius:26, blur:20, maxZoom:13, gradient:{0.25:'#12b981', 0.5:'#f59e0b', 0.8:'#e11d48'}}).addTo(h);
+}
+function applyVis(){
+  if(!map) return;
+  if(state.vis==='heat'){ map.removeLayer(layers.pins); map.addLayer(layers.heat); }
+  else { map.removeLayer(layers.heat); map.addLayer(layers.pins); }
+}
+function fenceIcon(p){
+  return L.divIcon({className:'', html:'<div style="font-size:20px;text-shadow:0 1px 4px rgba(0,0,0,.4)">'+p.emoji+'</div>', iconSize:[22,22], iconAnchor:[11,11]});
+}
+function drawFences(){
+  [layers.fences, layers.fences2].forEach(function(g){
+    g.clearLayers();
+    PLACES.forEach(function(p){
+      if(!p.on || !p.lat) return;
+      var c = '#0e5fd8';
+      L.circle([p.lat,p.lng],{radius:p.r, color:c, weight:2, fillColor:c, fillOpacity:0.10, dashArray:'6 5'}).addTo(g);
+      L.marker([p.lat,p.lng],{icon:fenceIcon(p)}).addTo(g)
+       .on('click',function(){ showView('luoghi'); openPlaceEditor(p.id); });
+    });
+  });
+}
+
+function initMaps(){
+  map = L.map('map',{zoomControl:true, zoomSnap:0.5}).setView([45.4705,9.19],12.6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap', maxZoom:19}).addTo(map);
+  layers.pins = L.layerGroup(); layers.heat = L.layerGroup(); layers.fences = L.layerGroup();
+  map.addLayer(layers.fences);
+  layers.fences2 = L.layerGroup();
+  map.on('click', onMapPick);
+  drawEvents(); applyVis();
+
+  map2 = L.map('map2',{zoomControl:true}).setView([45.4705,9.19],11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap', maxZoom:19}).addTo(map2);
+  map2.addLayer(layers.fences2);
+  map2.on('click', onMapPick2);
+}
+
+/* ---------- VISTE ---------- */
+function showView(v){
+  var ids = ['mappa','luoghi','control','assistant'];
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-view')===v); });
+  ids.forEach(function(x){
+    var el = document.getElementById('view-'+x);
+    if(el) el.style.display = (x===v ? '' : 'none');
+  });
+  setTimeout(function(){ if(map) map.invalidateSize(); if(map2) map2.invalidateSize(); }, 60);
+  if(v==='control') renderControl();
+  if(v==='luoghi') renderPlaces();
+  if(v==='assistant') setTimeout(function(){ var i=$('#chat-input'); if(i) i.focus(); }, 100);
+}
+
+/* ---------- FILTRI & FEED ---------- */
+function renderChips(){
+  var html = '';
+  Object.keys(CATS).forEach(function(k){
+    var c = CATS[k];
+    html += '<button class="chip'+(state.cats[k]?' on':'')+'" data-cat="'+k+'">'+c.i+' '+c.l+'</button>';
+  });
+  $('#cat-chips').innerHTML = html;
+}
+function renderFeed(){
+  var list = EVENTS.filter(visible).sort(function(a,b){ return a.min-b.min; });
+  var html = list.length ? '' : '<p style="color:var(--muted);font-size:12.5px;padding:8px">Nessun evento per i filtri attuali.</p>';
+  list.forEach(function(e){
+    html += '<div class="feed-item" data-ev="'+e.id+'">'+
+      '<div class="fi-ico" style="background:'+SEV[e.sev].c+'22">'+CATS[e.cat].i+'</div>'+
+      '<div style="min-width:0"><div class="fi-title">'+esc(e.title)+'</div>'+
+      '<div class="fi-sub"><span class="tag '+e.sev+'">'+SEV[e.sev].l+'</span><span class="tag '+e.st+'">'+ST[e.st]+'</span><span>'+esc(e.zone)+' · '+fmtD(e.min)+'</span></div></div></div>';
+  });
+  $('#feed').innerHTML = html;
+}
+function wireFilters(){
+  $('#cat-chips').addEventListener('click',function(e){
+    var b = e.target.closest('[data-cat]'); if(!b) return;
+    var k = b.getAttribute('data-cat');
+    state.cats[k] = !state.cats[k];
+    b.classList.toggle('on'); renderFeed(); drawEvents();
+  });
+  $('#seg-sev').addEventListener('click',function(e){
+    var b=e.target.closest('[data-v]'); if(!b) return;
+    document.querySelectorAll('#seg-sev button').forEach(function(x){x.classList.remove('on');});
+    b.classList.add('on'); state.sev = b.getAttribute('data-v'); renderFeed(); drawEvents();
+  });
+  $('#seg-vis').addEventListener('click',function(e){
+    var b=e.target.closest('[data-v]'); if(!b) return;
+    document.querySelectorAll('#seg-vis button').forEach(function(x){x.classList.remove('on');});
+    b.classList.add('on'); state.vis = b.getAttribute('data-v'); applyVis();
+  });
+  $('#sel-period').addEventListener('change',function(e){ state.period=e.target.value; renderFeed(); drawEvents(); });
+  $('#search').addEventListener('input',function(e){ state.search=e.target.value.trim(); renderFeed(); drawEvents(); });
+  $('#feed').addEventListener('click',function(e){
+    var f=e.target.closest('[data-ev]'); if(f) openEvent(f.getAttribute('data-ev'));
+  });
+}
+
+/* ---------- DETTAGLIO EVENTO ---------- */
+function openEvent(id){
+  var e = findEv(id); if(!e) return;
+  var trustCol = e.trust>75 ? '#0a9e6e' : (e.trust>55 ? '#c47d09' : '#dc2861');
+  var tlHtml = e.tl.slice().reverse().map(function(t,i){
+    return '<div class="tl-item"><div class="tl-dot" style="background:'+(i===0?'var(--accent)':'var(--muted)')+'"></div><div><div class="tl-t">-'+t[0]+' min</div><div class="tl-x">'+esc(t[1])+'</div></div></div>';
+  }).join('');
+  var html =
+    '<button class="modal-close" onclick="closeModal(\'modal-ev\')">✕</button>'+
+    '<h2>'+CATS[e.cat].i+' '+esc(e.title)+'</h2>'+
+    '<div class="m-sub"><span class="tag '+e.sev+'">Gravità: '+SEV[e.sev].l+'</span><span class="tag '+e.st+'">'+ST[e.st]+'</span><span>📍 '+esc(e.zone)+'</span><span>🕒 '+fmtD(e.min)+'</span><span>👥 '+e.reports+' segnalazioni</span></div>'+
+    '<div class="ev-meta">'+
+      '<div class="em"><div class="l">Fonte</div><div class="v">🧑‍🤝‍🧑 Comunità + verifica AI</div></div>'+
+      '<div class="em"><div class="l">Aggiornato</div><div class="v">'+fmtD(e.min)+'</div></div>'+
+    '</div>'+
+    '<div class="scores">'+
+      '<div class="score-box"><div class="l">Trust Score — attendibilità dell evento</div><div class="v" style="color:'+trustCol+'">'+e.trust+'/100</div><div class="d">'+e.reports+' segnalazioni indipendenti · coerenza verificata · nessun dato personale rilevato. La valutazione riguarda l evento, mai le persone.</div></div>'+
+      '<div class="score-box"><div class="l">Severity Score — gravità</div><div class="v" style="color:'+SEV[e.sev].c+'">'+e.sev_score+'/100</div><div class="d">Calcolato su categoria, impatto territoriale e rischio per circolazione e persone.</div></div>'+
+    '</div>'+
+    '<div class="field-label">Cronologia dell evento</div>'+
+    '<div class="timeline">'+tlHtml+'</div>'+
+    '<div class="modal-actions">'+
+      '<button class="btn primary sm" onclick="confirmEvent(\''+e.id+'\')">👍 Confermo (G01)</button>'+
+      '<button class="btn ghost sm" onclick="disputeEvent(\''+e.id+'\')">👎 Inaccurata (G02)</button>'+
+      '<button class="btn ghost sm" onclick="toggleFollow(\''+e.id+'\')" id="fol-'+e.id+'">'+(e.follow?'★ Segui ✓':'☆ Segui (G04)')+'</button>'+
+      '<button class="btn green sm" onclick="resolveEvent(\''+e.id+'\')">✅ Risolto (G09)</button>'+
+      '<button class="btn ghost sm" onclick="shareEvent(\''+e.id+'\')">🔗 Condividi (C14)</button>'+
+    '</div>';
+  $('#modal-ev-body').innerHTML = html;
+  $('#modal-ev').classList.add('show');
+}
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+function confirmEvent(id){
+  var e=findEv(id); if(!e) return;
+  e.st='confermato'; e.reports++; e.trust=Math.min(99,e.trust+4);
+  e.tl.push([0,'Conferma della community in tempo reale']);
+  closeModal('modal-ev'); renderFeed(); drawEvents(); renderControl();
+  toast('Grazie!','La tua conferma ha aumentato il Trust Score di questo evento.','👍');
+}
+function disputeEvent(id){
+  var e=findEv(id); if(!e) return;
+  e.trust=Math.max(5,e.trust-15); e.st='in-verifica';
+  e.tl.push([0,'Contestazione inviata: evento in re-verifica']);
+  closeModal('modal-ev'); renderFeed(); drawEvents(); renderControl();
+  toast('Smentita registrata','UrbanOS ha avviato la re-verifica dell evento.','🔍');
+}
+function resolveEvent(id){
+  var e=findEv(id); if(!e) return;
+  e.st='risolto'; e.tl.push([0,'Risolto · confermato dalla comunità']);
+  closeModal('modal-ev'); renderFeed(); drawEvents(); renderControl();
+  toast('Evento risolto','Stato aggiornato anche per chi segue questo evento.','✅');
+}
+function toggleFollow(id){
+  var e=findEv(id); if(!e) return;
+  e.follow=!e.follow;
+  toast(e.follow?'Segui evento':'Non segui più', e.follow?'Riceverai gli aggiornamenti e la notifica di risoluzione.':'Aggiornamenti disattivati per questo evento.','⭐');
+  openEvent(id);
+}
+function shareEvent(id){
+  closeModal('modal-ev');
+  toast('Link copiato (demo)','Link condivisibile dell evento validato: https://italiasicura.demo/evento/'+id,'🔗');
+}
+</script>
+
+<script>
+/* ---------- I MIEI LUOGHI ---------- */
+function nearbyEvents(p){
+  if(!p.lat || !p.on) return [];
+  var out = [];
+  EVENTS.forEach(function(e){
+    if(e.st==='risolto' || !visibleLite(e,p)) return;
+    var d = dist(p.lat,p.lng,e.lat,e.lng);
+    if(d<=p.r){ e._d = Math.round(d); out.push(e); }
+  });
+  out.sort(function(a,b){ return a._d-b._d; });
+  return out;
+}
+function visibleLite(e,p){
+  if(p.sev==='alta' && e.sev!=='alta') return false;
+  if(p.sev==='media' && e.sev==='bassa') return false;
+  return true;
+}
+function renderPlaces(){
+  var html='';
+  PLACES.forEach(function(p){
+    var evs = nearbyEvents(p);
+    var evHtml = evs.length ?
+      '<div class="p-status">'+evs.map(function(e){
+        return '<div class="p-event"><span class="dist">'+fmtM(e._d)+'</span><span><b>'+CATS[e.cat].i+' '+esc(e.title)+'</b><br><span style="color:var(--muted)">'+ST[e.st]+' · '+fmtD(e.min)+' · gravità '+SEV[e.sev].l.toLowerCase()+'</span></span></div>';
+      }).join('')+'</div>'
+      : '<div style="font-size:12px;color:var(--muted)">✅ Nessun evento attivo in raggio '+fmtM(p.r)+'.</div>';
+    html += '<div class="place'+(p._open?' open':'')+'" id="place-'+p.id+'">'+
+      '<div class="place-head" onclick="togglePlace(\''+p.id+'\')">'+
+        '<div class="p-ico">'+p.emoji+'</div>'+
+        '<div><div class="p-name">'+esc(p.name)+(p.temp?' <span class="tag nuovo">temporaneo</span>':'')+'</div>'+
+        '<div class="p-sub">'+esc(p.sub)+' · raggio '+fmtM(p.r)+' · '+(p.on?'🔔 attivo':'🔕 sospeso')+'</div></div>'+
+        '<div class="p-toggle">'+(p._open?'▾':'▸')+'</div></div>'+
+      '<div class="place-body">'+evHtml+
+        '<div class="range-row"><span style="font-size:11.5px;color:var(--muted)">Raggio</span>'+
+        '<input type="range" min="100" max="5000" step="100" value="'+p.r+'" oninput="setRadiusLive(\''+p.id+'\',this.value)">'+
+        '<span class="p-radius" id="pr-'+p.id+'">'+fmtM(p.r)+'</span></div>'+
+        '<div class="range-row"><span style="font-size:11.5px;color:var(--muted)">Notifica minima</span>'+
+        '<button class="btn sm '+(p.sev==='all'?'ghost':'red')+'" onclick="cycleSev(\''+p.id+'\')" style="margin-left:auto">'+(p.sev==='all'?'Tutti gli eventi':(p.sev==='media'?'Medi e gravi':'Solo gravi'))+'</button></div>'+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+          '<button class="btn sm ghost" onclick="pausePlace(\''+p.id+'\')">'+(p.on?'🔕 Sospendi':'🔔 Riattiva')+'</button>'+
+          '<button class="btn sm ghost" onclick="openPlaceEditor(\''+p.id+'\')">⚙️ Impostazioni</button>'+
+          '<button class="btn sm red" onclick="removePlace(\''+p.id+'\')">🗑️</button>'+
+        '</div>'+
+      '</div></div>';
+  });
+  $('#places').innerHTML = html + '<div class="p-clear-all">I luoghi personali restano privati e non compaiono sulla mappa pubblica.</div>';
+}
+function togglePlace(id){ var p=findPlace(id); p._open=!p._open; renderPlaces(); }
+function setRadiusLive(id,v){ var p=findPlace(id); p.r=+v; var el=document.getElementById('pr-'+id); if(el) el.textContent=fmtM(+v); drawFences(); }
+function cycleSev(id){ var p=findPlace(id); p.sev = p.sev==='all'?'media' : (p.sev==='media'?'alta':'all'); renderPlaces(); }
+function pausePlace(id){ var p=findPlace(id); p.on=!p.on; drawFences(); renderPlaces(); }
+function removePlace(id){
+  var i=-1; PLACES.forEach(function(p,idx){ if(p.id===id) i=idx; });
+  if(i>=0) PLACES.splice(i,1);
+  drawFences(); renderPlaces();
+  toast('Luogo eliminato','Zona rimossa dal motore geografico (demo).','🗑️');
+}
+
+var pickTarget = null;
+function openPlaceEditor(id){
+  state.editingPlace = id || null;
+  var p = id ? findPlace(id) : null;
+  $('#pm-title').textContent = p ? 'Impostazioni · '+p.name : 'Nuovo luogo';
+  $('#pm-name').value = p ? p.name : '';
+  $('#pm-radius').value = p ? p.r : 500;
+  $('#pm-radius-label').textContent = fmtM(p ? p.r : 500);
+  $('#pm-from').value = p ? p.from : '07:00';
+  $('#pm-to').value = p ? p.to : '22:00';
+  $('#pm-expiry').value = p && p.temp ? p.temp : '';
+  document.querySelectorAll('#pm-sev button').forEach(function(b){
+    b.classList.toggle('on', p ? b.getAttribute('data-v')===p.sev : b.getAttribute('data-v')==='all');
+  });
+  $('#modal-place').classList.add('show');
+}
+function onMapPick(e){
+  if(!state._pendingSave) return;
+  state._draft = {lat:e.latlng.lat, lng:e.latlng.lng};
+  L.circleMarker(e.latlng,{radius:8,color:'#0e5fd8',fillColor:'#0e5fd8',fillOpacity:0.7}).addTo(map);
+  toast('Posizione scelta','Ora torna al modulo e premi «Salva luogo».','📍');
+}
+function onMapPick2(e){
+  if(!state._pendingSave) return;
+  state._draft = {lat:e.latlng.lat, lng:e.latlng.lng};
+  L.circleMarker(e.latlng,{radius:8,color:'#e11d48',fillColor:'#e11d48',fillOpacity:0.7}).addTo(map2);
+  toast('Posizione acquisita','Coordinata selezionata. Ora premi «Salva luogo» nel modulo.','📍');
+}
+
+/* ---------- NOTIFICHE ---------- */
+function toast(title, text, icon, onclick){
+  var t = document.createElement('div');
+  t.className='toast';
+  t.innerHTML = '<div class="t-head"><span>'+icon+'</span><span>'+esc(title)+'</span><span style="margin-left:auto;font-size:10px;color:var(--muted)">ADESSO</span></div><div class="t-x">'+esc(text)+'</div>';
+  if(onclick) t.addEventListener('click',function(){ onclick(); t.remove(); });
+  $('#toasts').appendChild(t);
+  setTimeout(function(){ t.style.opacity='0'; t.style.transition='.4s'; setTimeout(function(){ t.remove(); },400); }, 7000);
+}
+function pushNotif(title, text, icon){
+  state.notifs.unshift({title:title, text:text, icon:icon, read:false, t:new Date()});
+  updateNotifBadge();
+  renderNotifPanel();
+}
+function updateNotifBadge(){
+  var unread = state.notifs.filter(function(n){return !n.read;}).length;
+  var b = $('#notif-badge');
+  b.textContent = unread; b.style.display = unread?'flex':'none';
+}
+function renderNotifPanel(){
+  var items = state.notifs.slice(0,12);
+  var html = '<h3 style="margin-bottom:10px">🔔 Notifiche in-app (D13)</h3>';
+  if(items.length){
+    items.forEach(function(n){
+      html += '<div class="audit-item"><span>'+n.icon+'</span><div style="flex:1"><b style="font-size:12.5px">'+esc(n.title)+'</b><div style="color:var(--muted);font-size:11.5px;margin-top:2px">'+esc(n.text)+'</div></div><span class="a-t">'+String(n.t.getHours()).padStart(2,'0')+':'+String(n.t.getMinutes()).padStart(2,'0')+'</span></div>';
+    });
+  } else {
+    html += '<p style="color:var(--muted);font-size:12.5px">Nessuna notifica. Prova 🔔 «Simula nuovo evento».</p>';
+  }
+  html += '<div class="modal-actions"><button class="btn ghost sm" onclick="clearNotifs()">Segna tutte come lette</button></div>';
+  $('#panel-notif').innerHTML = html;
+}
+function clearNotifs(){ state.notifs.forEach(function(n){n.read=true;}); updateNotifBadge(); renderNotifPanel(); }
+
+function seedSim(){
+  var tpl = SIM_POOL[Math.floor(Math.random()*SIM_POOL.length)];
+  var base = findPlace(tpl.near) || PLACES[0];
+  var e = E0({title:tpl.title, cat:tpl.cat, sev:tpl.sev, st:'nuovo', lat:base.lat+tpl.dLat, lng:base.lng+tpl.dLng,
+    zone:base.sub.replace(/.*·\s*/,''), min:tpl.dm, reports:1, trust:68,
+    sev_score: tpl.sev==='alta'?85:(tpl.sev==='media'?55:25), tl:[[0,'Segnalazione appena inviata (demo)']]});
+  EVENTS.unshift(e);
+  checkGeofence(e);
+  renderFeed(); drawEvents(); renderControl();
+}
+function checkGeofence(e){
+  PLACES.forEach(function(p){
+    if(!p.on || !p.lat || !visibleLite(e,p)) return;
+    var d = dist(p.lat,p.lng,e.lat,e.lng);
+    if(d<=p.r){
+      pushNotif('Alert zona '+p.name, e.title+' · a '+fmtM(Math.round(d))+' dal luogo · gravità '+SEV[e.sev].l.toLowerCase()+' · '+ST[e.st]+'. Simulazione del comportamento futuro dell app.','📍');
+      toast('Alert zona '+p.name, e.title+' · a '+fmtM(Math.round(d))+' · gravità '+SEV[e.sev].l+'.','📍',function(){ showView('mappa'); openEvent(e.id); });
+      pushAudit('geofence','Alert zona '+p.name+' → '+e.title+' ('+fmtM(Math.round(d))+')');
+    }
+  });
+}
+
+/* ---------- URBANOS ---------- */
+var AI_FLAGS = ['F01 Classificazione automatica','F02 Duplicati & correlazioni','F03 Trust Score','F04 Severity Score','F06 Conferme indipendenti','F07 Mascheramento volti/targhe','F08 PII nel testo: 0 rilevate','F10 Spam/abusi: filtrato','F11 Moderazione umana','F12 Spiegabilità: ON','F17 Audit: completo'];
+function pushAudit(mod, text){
+  state.audit.unshift({mod:mod, text:text, t:new Date()});
+  if(state.audit.length>40) state.audit.pop();
+}
+function renderControl(){
+  var tot=EVENTS.length;
+  var inv=EVENTS.filter(function(e){return e.st==='in-verifica';}).length;
+  var conf=EVENTS.filter(function(e){return e.st==='confermato';}).length;
+  var ris=EVENTS.filter(function(e){return e.st==='risolto';}).length;
+  var avgT = Math.round(EVENTS.reduce(function(a,e){return a+e.trust;},0)/Math.max(1,tot));
+  var kpis = [
+    {l:'Eventi gestiti', v:tot, s:'ultime 72 h (demo)'},
+    {l:'In verifica', v:inv, s:'coda di moderazione'},
+    {l:'Confermati attivi', v:conf, s:'visibili sulla mappa'},
+    {l:'Risolti', v:ris, s:'con conferma comunità'},
+    {l:'Affidabilità media', v:avgT+'/100', s:'Trust Score aggregato'},
+    {l:'Tempo medio moderazione', v:'3m 42s', s:'KPI (valore demo)'}
+  ];
+  $('#kpis').innerHTML = kpis.map(function(k){
+    return '<div class="kpi"><div class="k-l">'+k.l+'</div><div class="k-v">'+k.v+'</div><div class="k-s">'+k.s+'</div></div>';
+  }).join('');
+
+  var q = EVENTS.filter(function(e){return e.st==='in-verifica';})
+    .sort(function(a,b){ return (b.sev_score+b.trust)-(a.sev_score+a.trust); });
+  var html = q.length ? '' : '<tr><td colspan="5" style="color:var(--muted);padding:20px;text-align:center">✅ Nessun evento in coda. «No gaps detected in current data. Continue monitoring».</td></tr>';
+  q.forEach(function(e){
+    var trustCol = e.trust>75?'#12b981':(e.trust>55?'#f59e0b':'#e11d48');
+    html += '<tr><td><b>'+CATS[e.cat].i+' '+esc(e.title)+'</b><br><span style="color:var(--muted);font-size:11.5px">'+esc(e.zone)+' · '+fmtD(e.min)+' · '+e.reports+' segnalazioni</span></td>'+
+      '<td><span class="tag '+e.sev+'">'+SEV[e.sev].l+'</span></td>'+
+      '<td><div class="trust-bar"><div class="tb-track"><div class="tb-fill" style="width:'+e.trust+'%;background:'+trustCol+'"></div></div><b style="font-size:12px">'+e.trust+'</b></div>'+
+      (e.trust<60?'<div style="font-size:10.5px;color:var(--muted);margin-top:3px">⚠️ sotto soglia 60 → moderazione umana obbligatoria (F11)</div>':'')+'</td>'+
+      '<td><span class="sco '+(e.sev_score>70?'hi':(e.sev_score>40?'md':'lo'))+'">'+e.sev_score+'</span></td>'+
+      '<td style="white-space:nowrap"><button class="btn green sm" onclick="modApprove(\''+e.id+'\')">Approva</button> <button class="btn red sm" onclick="modReject(\''+e.id+'\')">Rifiuta</button></td></tr>';
+  });
+  $('#queue-body').innerHTML = html;
+
+  var aud = state.audit.length ? state.audit : [{mod:'system', text:'Sessione di moderazione demo avviata · audit attivo (F17)', t:new Date()}];
+  $('#audit').innerHTML = aud.map(function(a){
+    return '<div class="audit-item"><span class="tag nuovo">'+a.mod+'</span><div style="flex:1">'+esc(a.text)+'</div><span class="a-t">'+String(a.t.getHours()).padStart(2,'0')+':'+String(a.t.getMinutes()).padStart(2,'0')+'</span></div>';
+  }).join('');
+
+  $('#ai-flags').innerHTML = AI_FLAGS.map(function(f){ return '<span class="chip on" style="pointer-events:none">'+f+'</span>'; }).join('');
+}
+function modApprove(id){
+  var e=findEv(id); if(!e) return;
+  e.st='confermato'; e.trust=Math.min(99,e.trust+6);
+  e.tl.push([0,'Approvato dalla moderazione UrbanOS']);
+  pushAudit('moderazione','Approvato: '+e.title+' → confermato, Trust '+e.trust);
+  toast('Evento approvato','«'+e.title+'» ora è confermato e visibile ai cittadini.','✅');
+  renderControl(); renderFeed(); drawEvents(); renderPlaces();
+}
+function modReject(id){
+  var e=findEv(id); if(!e) return;
+  var i = EVENTS.indexOf(e); if(i>=0) EVENTS.splice(i,1);
+  pushAudit('moderazione','Rifiutato e rimosso: '+e.title+' (F10/F13 · contestabile dall autore)');
+  toast('Evento rifiutato','«'+e.title+'» rimosso dalla mappa. L autore può contestare (F13).','🚫');
+  renderControl(); renderFeed(); drawEvents(); renderPlaces();
+}
+
+/* ---------- AI ASSISTANT ---------- */
+var QUICK = ['Cosa succede vicino alla scuola?','Riassunto di oggi a Milano','Dove ci sono più segnalazioni?','La zona di casa è tranquilla?'];
+function askAI(q){
+  var box = $('#msgs');
+  var hi = box.querySelector('.chat-hi'); if(hi) hi.remove();
+  box.insertAdjacentHTML('beforeend','<div class="msg user">'+esc(q)+'</div>');
+  $('#chat-input').value='';
+  box.insertAdjacentHTML('beforeend','<div class="msg bot" id="typing">⏳ Analizzo gli eventi disponibili (demo)…</div>');
+  box.scrollTop = box.scrollHeight;
+  setTimeout(function(){
+    var ans = answer(q);
+    var t = box.querySelector('#typing');
+    if(t){ t.removeAttribute('id'); t.textContent = ans; }
+    box.scrollTop = box.scrollHeight;
+  }, 700);
+}
+function answer(q){
+  var s = q.toLowerCase();
+  var act = EVENTS.filter(function(e){return e.st!=='risolto';});
+  var place = null;
+  if(s.indexOf('scuol')>=0) place = findPlace('p3');
+  else if(s.indexOf('casa')>=0 || s.indexOf('monza')>=0) place = findPlace('p1');
+  else if(s.indexOf('lavor')>=0) place = findPlace('p2');
+  if(place){
+    var evs = nearbyEvents(place);
+    if(!evs.length) return 'Vicino a «'+place.name+'» ('+place.sub+') non risultano eventi attivi entro il raggio di '+fmtM(place.r)+' nella demo.\n\nCosa verificherebbe l app reale: fonte, orario, stato di verifica e aggiornamenti — senza inventare informazioni mancanti.';
+    var lines = evs.map(function(e){
+      return '• '+CATS[e.cat].i+' '+e.title+' — '+ST[e.st]+', a ~'+fmtM(e._d)+', '+fmtD(e.min)+', gravità '+SEV[e.sev].l.toLowerCase()+', Trust '+e.trust+'/100';
+    });
+    return 'Stato vicino a «'+place.name+'» ('+place.sub+'), entro '+fmtM(place.r)+':\n\n'+lines.join('\n')+'\n\nFonti: segnalazioni community verificate da UrbanOS. Ultima verifica: adesso (demo).';
+  }
+  if(s.indexOf('riassum')>=0 || s.indexOf('oggi')>=0){
+    var byCat = {};
+    act.forEach(function(e){ byCat[e.cat]=(byCat[e.cat]||0)+1; });
+    var topc = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; });
+    var hi = act.filter(function(e){return e.sev==='alta';}).length;
+    var ver = act.filter(function(e){return e.st==='in-verifica';}).length;
+    return 'Riassunto demo (eventi attivi: '+act.length+'):\n\n'+topc.map(function(c){ return '• '+CATS[c].i+' '+CATS[c].l+': '+byCat[c]+' eventi attivi'; }).join('\n')+'\n\nDi cui '+hi+' a gravità alta e '+ver+' ancora in verifica.\n\nCome nel riepilogo giornaliero D09, inviato solo per i tuoi luoghi.';
+  }
+  if(s.indexOf('più segnal')>=0 || s.indexOf('dove')>=0 || s.indexOf('zone')>=0){
+    var byZone = {};
+    act.forEach(function(e){ byZone[e.zone]=(byZone[e.zone]||0)+1; });
+    var topz = Object.keys(byZone).sort(function(a,b){ return byZone[b]-byZone[a]; }).slice(0,5);
+    return 'Zone con più eventi attivi nella demo:\n\n'+topz.map(function(z){ return '• '+z+': '+byZone[z]+' eventi attivi'; }).join('\n')+'\n\n(Dati aggregati per territorio, senza profilare persone — come richiesto dal concept.)';
+  }
+  var hiA = act.filter(function(e){return e.sev==='alta';}).length;
+  return 'Posso aiutarti con domande sui dati demo, ad esempio:\n\n• «Cosa succede vicino a casa / scuola / lavoro?»\n• «Riassunto di oggi a Milano»\n• «Dove ci sono più segnalazioni?»\n\nAdesso: '+act.length+' eventi attivi, di cui '+hiA+' a gravità alta.';
+}
+
+/* ---------- TEMA & INIT ---------- */
+function enablePick(){ state._pendingSave = true; }
+function savePlace(){
+  var name = $('#pm-name').value.trim() || 'Nuovo luogo';
+  var sevBtn = document.querySelector('#pm-sev .on');
+  var sev = sevBtn ? sevBtn.getAttribute('data-v') : 'all';
+  var radius = +$('#pm-radius').value;
+  var exp = $('#pm-expiry').value || null;
+  var geo = state.editingPlace ? findPlace(state.editingPlace) : null;
+  if(!geo){
+    var t = (state._draft && state._draft.lat) ? state._draft : {lat:45.4705+(Math.random()-0.5)*0.02, lng:9.19+(Math.random()-0.5)*0.03};
+    geo = {id:'p'+Date.now(), emoji:'📍', name:name, sub:'Milano · personalizzato', lat:t.lat, lng:t.lng, r:radius, sev:sev, from:$('#pm-from').value, to:$('#pm-to').value, temp:exp, on:true};
+    PLACES.push(geo);
+    pushAudit('.places','Nuovo luogo creato: '+name+' (raggio '+fmtM(radius)+')');
+    toast('Luogo salvato (demo)','Il motore geografico monitorerà: '+name+' · raggio '+fmtM(radius)+'.','📍');
+  } else {
+    geo.name=name; geo.r=radius; geo.sev=sev;
+    geo.from=$('#pm-from').value; geo.to=$('#pm-to').value; geo.temp=exp;
+    pushAudit('.places','Luogo aggiornato: '+name);
+    toast('Impostazioni salvate','Zona «'+name+'» aggiornata · raggio '+fmtM(radius)+'.','⚙️');
+  }
+  state._draft = null; state._pendingSave = false; state.editingPlace = null;
+  closeModal('modal-place'); drawFences(); renderPlaces(); renderControl();
+}
+function initGlobal(){
+  $('#tabs').addEventListener('click',function(e){
+    var b = e.target.closest('.tab-btn');
+    if(b) showView(b.getAttribute('data-view'));
+  });
+  $('#btn-theme').addEventListener('click',function(){
+    document.body.classList.toggle('dark');
+    var dark = document.body.classList.contains('dark');
+    $('#btn-theme').textContent = dark ? '☀️' : '🌙';
+    try{ localStorage.setItem('theme', dark?'dark':'light'); }catch(err){}
+  });
+  $('#btn-notif').addEventListener('click',function(e){ e.stopPropagation(); $('#panel-notif').classList.toggle('show'); renderNotifPanel(); });
+  document.addEventListener('click',function(e){ if(!e.target.closest('#panel-notif,#btn-notif')) $('#panel-notif').classList.remove('show'); });
+  $('#modal-ev').addEventListener('click',function(e){ if(e.target.id==='modal-ev') closeModal('modal-ev'); });
+  $('#modal-place').addEventListener('click',function(e){ if(e.target.id==='modal-place') closeModal('modal-place'); });
+  $('#btn-near').addEventListener('click',function(){
+    var c = map.getCenter();
+    var near = EVENTS.filter(function(e){ return e.st!=='risolto' && dist(c.lat,c.lng,e.lat,e.lng)<2500; }).length;
+    pushNotif('Eventi vicino a te (simulato)', near+' eventi attivi entro 2,5 km dalla posizione corrente della mappa.','🎯');
+    toast('Rilevamento locale', near+' eventi attivi entro 2,5 km. Nessun tracciamento continuo: solo confronto area ↔ evento.','🎯');
+  });
+  $('#btn-instance').addEventListener('click',function(){ seedSim(); });
+  $('#btn-instance2').addEventListener('click',function(){ seedSim(); });
+  $('#btn-add-place').addEventListener('click',function(){ enablePick(); openPlaceEditor(null); });
+  $('#btn-add-place2').addEventListener('click',function(){ enablePick(); openPlaceEditor(null); });
+  $('#pm-go-map').addEventListener('click',function(){
+    closeModal('modal-place'); showView('luoghi');
+    toast('Scegli sulla mappa','Tocca nella mappa a destra il punto esatto del luogo, poi riapri «Salva luogo» dal modulo.','📍');
+  });
+  $('#pm-save').addEventListener('click',savePlace);
+  $('#pm-days').innerHTML = DAYS.map(function(d){ return '<button class="chip on">'+d+'</button>'; }).join('');
+  $('#pm-days').addEventListener('click',function(e){ var b=e.target.closest('.chip'); if(b) b.classList.toggle('on'); });
+  $('#pm-sev').addEventListener('click',function(e){
+    var b=e.target.closest('[data-v]'); if(!b) return;
+    document.querySelectorAll('#pm-sev button').forEach(function(x){x.classList.remove('on');});
+    b.classList.add('on');
+  });
+  $('#pm-radius').addEventListener('input',function(e){ $('#pm-radius-label').textContent = fmtM(+e.target.value); });
+  $('#quick').innerHTML = QUICK.map(function(q){ return '<button class="chip" onclick="askAI(\''+q.replace(/'/g,"\\'")+'\')">'+q+'</button>'; }).join('');
+  $('#btn-send').addEventListener('click',function(){ var v=$('#chat-input').value.trim(); if(v) askAI(v); });
+  $('#chat-input').addEventListener('keydown',function(e){ if(e.key==='Enter'){ var v=$('#chat-input').value.trim(); if(v) askAI(v);} });
+  try{
+    if(localStorage.getItem('theme')==='dark'){ document.body.classList.add('dark'); $('#btn-theme').textContent='☀️'; }
+  }catch(err){}
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  initMaps(); initGlobal();
+  renderChips(); renderFeed(); renderPlaces(); renderControl(); renderNotifPanel(); updateNotifBadge();
+  drawFences();
+  wireFilters();
+  pushAudit('system','Demo avviata · motore geografico simulato: '+PLACES.length+' zone monitorate');
+  setTimeout(function(){
+    var sc = findPlace('p3');
+    var d1 = Math.round(dist(sc.lat,sc.lng,45.4861,9.1919));
+    pushNotif('Attenzione nella zona Scuola dei figli','Allagamento in via Pola · a ~'+fmtM(d1)+' dalla zona · confermato · aggiornato 2 min fa. Simulazione: nessun evento reale.','💧');
+    toast('Alert geografico (D02)','Attenzione nella zona Scuola: allagamento confermato a ~270 m. Segnalazione confermata e aggiornata 2 minuti fa. Tocca per aprire.','💧',function(){
+      showView('mappa');
+      var ev = EVENTS.filter(function(e){return e.cat==='water' && e.st==='confermato';})[0];
+      if(ev) openEvent(ev.id);
+    });
+  }, 2200);
+});
+</script>
+</body>
+</html>
